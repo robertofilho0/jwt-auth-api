@@ -1,28 +1,7 @@
-# Dependências
 node_modules/
-
-# Variáveis de ambiente
+coverage/
 .env
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Arquivos temporários
-.tmp
-temp/
-*.tmp
-
-# Cache
-.cache
-dist/
-build/
-
-# VSCode
-.vscode/
-
-# Sistema
+.env.*
+!.env.example
+*.log
 .DS_Store
-Thumbs.db
