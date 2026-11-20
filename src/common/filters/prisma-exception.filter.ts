@@ -3,6 +3,7 @@ import {
   Catch,
   ExceptionFilter,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { Prisma } from '../../generated/prisma/client.js';
@@ -10,6 +11,8 @@ import { Prisma } from '../../generated/prisma/client.js';
 /** Converte erros conhecidos do Prisma em respostas HTTP adequadas. */
 @Catch(Prisma.PrismaClientKnownRequestError)
 export class PrismaExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(PrismaExceptionFilter.name);
+
   catch(
     error: Prisma.PrismaClientKnownRequestError,
     host: ArgumentsHost,
@@ -28,6 +31,9 @@ export class PrismaExceptionFilter implements ExceptionFilter {
       HttpStatus.INTERNAL_SERVER_ERROR,
       'Erro interno do servidor',
     ];
+    if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+      this.logger.error(`Erro do Prisma ${error.code}: ${error.message}`);
+    }
 
     response.status(status).json({ statusCode: status, message });
   }

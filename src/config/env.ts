@@ -8,6 +8,7 @@ export const envSchema = z.object({
     .default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL é obrigatório'),
+  DATABASE_POOL_MAX: z.coerce.number().int().positive().default(10),
   CORS_ORIGIN: z.string().default('*'),
   JWT_SECRET: isTest
     ? z.string().default('test-secret-test-secret-test-secret')
