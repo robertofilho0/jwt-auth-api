@@ -2,27 +2,29 @@ services:
   api:
     build: .
     ports:
-      - '5000:5000'
+      - '3000:3000'
     environment:
-      PORT: 5000
-      MONGO_URI: mongodb://mongo:27017/jwt-auth-api
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/jwt_auth
       JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-dev-only-secret}
     depends_on:
-      mongo:
+      postgres:
         condition: service_healthy
     restart: unless-stopped
 
-  mongo:
-    image: mongo:7
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: jwt_auth
     ports:
-      - '27017:27017'
+      - '5432:5432'
     volumes:
-      - mongo-data:/data/db
+      - pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping')"]
-      interval: 10s
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
 volumes:
-  mongo-data:
+  pg-data:

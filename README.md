@@ -1,47 +1,55 @@
 # 🔐 JWT Auth API
 
 [![CI](https://github.com/robertofilho0/jwt-auth-api/actions/workflows/ci.yml/badge.svg)](https://github.com/robertofilho0/jwt-auth-api/actions/workflows/ci.yml)
-![Node](https://img.shields.io/badge/node-%3E%3D22-339933?logo=node.js&logoColor=white)
-![Express](https://img.shields.io/badge/express-5-000000?logo=express)
-![MongoDB](https://img.shields.io/badge/mongodb-7-47A248?logo=mongodb&logoColor=white)
+![NestJS](https://img.shields.io/badge/nestjs-12-E0234E?logo=nestjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/typescript-6-3178C6?logo=typescript&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/postgresql-17-4169E1?logo=postgresql&logoColor=white)
+![Prisma](https://img.shields.io/badge/prisma-7-2D3748?logo=prisma&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-API de autenticação com **access token JWT de curta duração**, **refresh token com rotação e detecção de reuso**, gerenciamento de sessões e **controle de acesso por papel (RBAC)**.
+API de autenticação em **NestJS + TypeScript** com **access token JWT de curta duração**, **refresh token com rotação e detecção de reuso**, gerenciamento de sessões e **controle de acesso por papel (RBAC)**, sobre **PostgreSQL** com **Prisma**.
 
 ## ✨ Destaques de segurança
 
-| Prática                    | Como foi implementada                                                                  |
-| -------------------------- | -------------------------------------------------------------------------------------- |
-| Access token curto         | JWT assinado com `sub` e `role`, expira em 15 min por padrão e valida o `issuer`       |
-| Refresh token opaco        | 48 bytes aleatórios. Só o **hash SHA-256** é salvo no banco                            |
-| Rotação                    | Cada `/refresh` revoga o token usado e emite um novo                                   |
-| Detecção de reuso          | Reapresentar um refresh token já usado revoga **toda a família** (sessão comprometida) |
-| Expiração automática       | Índice TTL do MongoDB remove tokens expirados                                          |
-| Senhas                     | bcrypt com custo configurável e política de senha forte                                |
-| Sem enumeração de usuários | Mesma mensagem e tempo semelhante para usuário inexistente ou senha errada             |
-| Força bruta                | Rate limit específico para login/cadastro (10 tentativas falhas a cada 15 min)         |
-| Troca de senha             | Revoga todas as sessões ativas                                                         |
-| Configuração segura        | `JWT_SECRET` obrigatório com no mínimo 32 caracteres, validado na inicialização        |
-| Headers HTTP               | Helmet, CORS configurável e `x-powered-by` desativado                                  |
+| Prática                    | Como foi implementada                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------- |
+| Access token curto         | JWT com `sub` e `role`, 15 min por padrão, validando o `issuer`                              |
+| Refresh token opaco        | 48 bytes aleatórios. Só o **hash SHA-256** é salvo no banco                                 |
+| Rotação                    | Cada `/refresh` revoga o token usado (update condicional, seguro contra concorrência)        |
+| Detecção de reuso          | Reapresentar um token já usado revoga **toda a família** de tokens daquele login            |
+| Senhas                     | bcrypt com custo configurável e política de senha forte                                     |
+| Sem enumeração de usuários | Mesma resposta e tempo semelhante para usuário inexistente ou senha errada                  |
+| Força bruta                | `@nestjs/throttler` com limite específico em login e cadastro                               |
+| Troca de senha             | Revoga todas as sessões ativas                                                              |
+| Configuração segura        | Variáveis de ambiente validadas com Zod na inicialização (`JWT_SECRET` com 32+ caracteres)   |
+| Autorização                | Guard global de JWT (rotas são privadas por padrão, `@Public()` libera) + `@Roles('ADMIN')` |
 
 ## 🧱 Stack
 
-Node.js 22+ · Express 5 · MongoDB / Mongoose · jsonwebtoken · bcryptjs · Zod · Jest · Supertest · Docker
+NestJS 12 · TypeScript · PostgreSQL 17 · Prisma 7 · Zod (validação nativa do Nest via Standard Schema) · Swagger · Vitest · Supertest · Oxlint · Docker
 
 ## 📁 Estrutura
 
 ```
 src/
-├── app.js / server.js
-├── config/                 # env validado (Zod) e conexão com o banco
-├── controllers/            # auth e users
-├── middlewares/auth.js     # authenticate + authorize(...roles)
-├── models/                 # User, RefreshToken
-├── services/token.service.js  # emissão, rotação e revogação de tokens
-├── validators/             # schemas Zod
-└── docs/openapi.json       # Swagger em /docs
-scripts/create-admin.js     # cria ou promove um administrador
-tests/                      # testes de validação e de integração
+├── main.ts / setup-app.ts     # bootstrap, Helmet, CORS, validação global e Swagger
+├── app.module.ts
+├── config/env.ts              # schema Zod das variáveis de ambiente
+├── prisma/                    # PrismaService (adapter pg) global
+├── auth/
+│   ├── auth.controller.ts     # register, login, refresh, logout, logout-all, sessions
+│   ├── auth.service.ts
+│   ├── token.service.ts       # emissão, rotação e revogação de tokens
+│   ├── jwt-auth.guard.ts      # guard global
+│   └── roles.guard.ts
+├── users/                     # perfil, troca de senha e administração
+├── common/                    # decorators, filtro de erros do Prisma e pipe de validação
+└── health/
+prisma/
+├── schema.prisma
+├── migrations/
+└── seed.ts
+test/                          # testes e2e contra PostgreSQL real
 ```
 
 ## 🚀 Como rodar
@@ -54,37 +62,21 @@ cd jwt-auth-api
 docker compose up --build
 ```
 
-API em `http://localhost:5000` e documentação em `http://localhost:5000/docs`.
+As migrations são aplicadas automaticamente. A API fica em `http://localhost:3000/api` e o Swagger em `http://localhost:3000/docs`.
 
 ### Localmente
 
 ```bash
-npm install
-cp .env.example .env   # defina MONGO_URI e um JWT_SECRET forte
-npm run dev
+npm install                 # também gera o Prisma Client
+cp .env.example .env        # ajuste DATABASE_URL e JWT_SECRET
+npx prisma migrate deploy
+npm run db:seed             # opcional: admin@exemplo.com / Admin1234
+npm run start:dev
 ```
-
-Para criar um administrador:
-
-```bash
-ADMIN_EMAIL=admin@exemplo.com ADMIN_PASSWORD='Admin1234' npm run create-admin
-```
-
-### Variáveis de ambiente
-
-| Variável                 | Padrão                                   | Descrição                                |
-| ------------------------ | ---------------------------------------- | ---------------------------------------- |
-| `PORT`                   | `5000`                                   | Porta HTTP                               |
-| `MONGO_URI`              | `mongodb://localhost:27017/jwt-auth-api` | Conexão com o MongoDB                    |
-| `JWT_SECRET`             | obrigatório                              | Chave de assinatura (mín. 32 caracteres) |
-| `JWT_EXPIRES_IN`         | `15m`                                    | Validade do access token                 |
-| `REFRESH_TOKEN_TTL_DAYS` | `7`                                      | Validade do refresh token                |
-| `BCRYPT_ROUNDS`          | `12`                                     | Custo do hash de senha                   |
-| `CORS_ORIGIN`            | `*`                                      | Origens permitidas                       |
 
 ## 📚 Endpoints
 
-| Método  | Rota                     | Auth   | Descrição                        |
+| Método  | Rota                     | Acesso | Descrição                        |
 | ------- | ------------------------ | ------ | -------------------------------- |
 | `POST`  | `/api/auth/register`     | —      | Cadastro                         |
 | `POST`  | `/api/auth/login`        | —      | Login por username ou e-mail     |
@@ -97,35 +89,36 @@ ADMIN_EMAIL=admin@exemplo.com ADMIN_PASSWORD='Admin1234' npm run create-admin
 | `PATCH` | `/api/users/me/password` | Bearer | Troca a senha                    |
 | `GET`   | `/api/users`             | Admin  | Lista usuários (paginado)        |
 | `PATCH` | `/api/users/:id/role`    | Admin  | Altera o papel de um usuário     |
+| `GET`   | `/api/health`            | —      | Status da API e do banco         |
 
-### Fluxo
-
-```bash
-# 1. Cadastro
-curl -X POST http://localhost:5000/api/auth/register -H "Content-Type: application/json" \
-  -d '{"name":"Ana Souza","username":"ana.souza","email":"ana@exemplo.com","password":"Senha123"}'
-
-# 2. Login → { user, accessToken, refreshToken, tokenType, expiresIn }
-curl -X POST http://localhost:5000/api/auth/login -H "Content-Type: application/json" \
-  -d '{"login":"ana.souza","password":"Senha123"}'
-
-# 3. Rota protegida
-curl http://localhost:5000/api/users/me -H "Authorization: Bearer <accessToken>"
-
-# 4. Quando o access token expirar
-curl -X POST http://localhost:5000/api/auth/refresh -H "Content-Type: application/json" \
-  -d '{"refreshToken":"<refreshToken>"}'
-```
-
-## 🧪 Testes
+Os schemas de entrada são definidos com Zod e aparecem automaticamente no Swagger.
 
 ```bash
-npm test               # usa um MongoDB em memória
-npm run test:coverage
-npm run lint
+curl -X POST http://localhost:3000/api/auth/login -H "Content-Type: application/json" \
+  -d '{"login":"admin","password":"Admin1234"}'
+# → { user, accessToken, refreshToken, tokenType: "Bearer", expiresIn: "15m" }
 ```
 
-Os testes cobrem cadastro, login, perfil, troca de senha, rotação e reuso de refresh token, logout, sessões e permissões de admin.
+Erros de validação seguem um formato único:
+
+```json
+{
+  "statusCode": 400,
+  "message": "Dados inválidos",
+  "errors": [{ "campo": "password", "mensagem": "A senha deve conter uma letra maiúscula" }]
+}
+```
+
+## 🧪 Testes e qualidade
+
+```bash
+npm test               # testes unitários
+npm run test:e2e       # testes e2e (requer DATABASE_URL de um PostgreSQL)
+npm run lint           # Oxlint com regras type-aware
+npm run typecheck
+```
+
+O CI sobe um PostgreSQL 17, aplica as migrations, **confere se elas batem com o `schema.prisma`** e roda lint, testes unitários, e2e e build.
 
 ## 📄 Licença
 

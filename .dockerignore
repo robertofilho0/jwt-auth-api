@@ -1,6 +1,8 @@
 node_modules
+dist
 coverage
-tests
+src/generated
+test
 .git
 .github
 .env
